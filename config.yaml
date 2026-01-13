@@ -1,0 +1,51 @@
+# ============================================
+# DATA CONFIGURATION
+# ============================================
+data:
+  data_dir: "/workspace/geoai/flood_data/sturm"
+  
+  # Which modality to use? Pick ONE:
+  # - "s1"      (Sentinel-1 SAR only - 2 channels)
+  # - "s2"      (Sentinel-2 Optical only - 11 channels)  
+  # - "s1_s2"   (Both combined - 13 channels)
+  modality: "s1"  # ← JUST CHANGE THIS
+  
+  # Which mask to use?
+  # - "s1" (Sentinel-1 mask)
+  # - "s2" (Sentinel-2 mask)
+  mask_source: "s1"
+  
+  train_val_split: 0.8
+  random_seed: 42
+
+# ============================================
+# MODEL CONFIGURATION
+# ============================================
+model:
+  # Channels auto-calculated from modality:
+  # s1: 2 channels
+  # s2: 11 channels
+  # s1_s2: 13 channels
+  loss_function: "BCEWithLogitsLoss"  # Binary Cross Entropy Loss
+  encoder_name: "resnet18"  # Try: resnet34, resnet50, efficientnet-b0
+  encoder_weights: "imagenet"
+  classes: 1  # Binary: flood or not
+  activation: 'none'
+
+# ============================================
+# TRAINING CONFIGURATION
+# ============================================
+training:
+  batch_size: 8
+  num_workers: 2
+  num_epochs: 10
+  learning_rate: 0.0001
+  device: "cuda"  # or "cpu"
+
+# ============================================
+# OUTPUT CONFIGURATION
+# ============================================
+output:
+  checkpoint_dir: "./outputs/models"
+  log_dir: "./outputs/logs"
+  plot_dir: "./outputs/plots"
