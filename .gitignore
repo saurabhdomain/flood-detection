@@ -41,3 +41,4 @@ Thumbs.db
 venv/
 env/
 .env
+.geoai/

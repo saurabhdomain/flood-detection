@@ -38,8 +38,11 @@ model:
 training:
   batch_size: 8
   num_workers: 2
-  num_epochs: 10
+  num_epochs: 50
   learning_rate: 0.0001
+  weight_decay: 1e-4          # ← Add this
+  dropout_rate: 0.3           # ← Add this
+  early_stopping_patience: 5  # ← Add this
   device: "cuda"  # or "cpu"
 
 # ============================================

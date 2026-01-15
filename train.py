@@ -4,7 +4,11 @@ import yaml
 from torch.utils.data import DataLoader
 from pathlib import Path
 from tqdm import tqdm
-import time
+import os
+import json
+
+script_dir = Path(__file__).resolve().parent
+os.chdir(script_dir)
 
 # load config
 with open('config.yaml','r') as f:
@@ -29,7 +33,7 @@ val_dataset = FloodDataset(CONFIG['data']['data_dir'],CONFIG['data']['modality']
 
 train_loader = DataLoader(training_dataset,CONFIG['training']['batch_size'],shuffle = True,num_workers = CONFIG['training']['num_workers'])
 
-val_loader = DataLoader(val_dataset,CONFIG['training']['batch_size'],shuffle = True,num_workers = CONFIG['training']['num_workers'])
+val_loader = DataLoader(val_dataset,CONFIG['training']['batch_size'],shuffle = False,num_workers = CONFIG['training']['num_workers'])
 
 
 print(f" train batch {len(train_loader)}")
@@ -39,15 +43,17 @@ print(f" validation  batch {len(val_loader)}")
 
 print('Creating Model....')
 
-model = create_model(CONFIG['data']['modality'],CONFIG['model']['encoder_name'],device= Device)
+model = create_model(CONFIG['data']['modality'],CONFIG['model']['encoder_name'],
+                     device= Device,dropout_rate= CONFIG['model'].get('dropout_rate',0.3))
 
 
 # Setup Training
 
 criterion = nn.BCEWithLogitsLoss()
 
-optimiser = torch.optim.Adam(model.parameters(),lr = CONFIG['training']['learning_rate'])
+optimiser = torch.optim.Adam(model.parameters(),lr = CONFIG['training']['learning_rate'], weight_decay= 1e-5)
 
+scheduler = torch .optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode= 'min', factor =0.5 , patience= 3)
 # create output directorry
 
 output_dir = Path(CONFIG['output']['checkpoint_dir'])
@@ -55,10 +61,21 @@ output_dir.mkdir(parents=True, exist_ok=True)
 
 print(f"✓ Loss: BCEWithLogitsLoss")
 print(f"✓ Optimizer: Adam (lr={CONFIG['training']['learning_rate']})\n")
+print(f"✓ Scheduler: ReduceLROnPlateau (patience=3)\n")
 
-# training loop
+# training loop with history tracking
 
 best_val_loss = float('inf')
+patience_counter =0
+max_patience = 5
+
+history={
+    'epoch' :[],
+    'train_losses':[],
+    'val_losses':[],
+    'learning rate(lr)' :[]
+}
+
 
 for epoch in range(CONFIG['training']['num_epochs']):
 
@@ -110,16 +127,28 @@ for epoch in range(CONFIG['training']['num_epochs']):
     
     avg_val_loss = val_loss/ len(val_loader)
 
+
+    # track history
+    history['epoch'].append(epoch +1)
+    history['train_losses'].append(avg_train_loss)
+    history['val_losses'].append(avg_val_loss)
+    history['learning rate(lr)'].append(optimiser.param_groups[0]['lr'])
+
     # ---- PRINT RESULTS ----
     print(f"\nEpoch {epoch+1} Summary:")
     print(f"  Train Loss: {avg_train_loss:.4f}")
     print(f"  Val Loss:   {avg_val_loss:.4f}")
+    print(f"  LR:         {optimiser.param_groups[0]['lr']:.6f}")
+    print(f"  Gap:        {avg_val_loss - avg_train_loss:.4f}")
 
+# Update learning rate based on validation loss
 
+    scheduler.step(avg_val_loss)
     #----- save checkpoint -----
 
     if avg_val_loss<best_val_loss:
         best_val_loss = avg_val_loss
+        patience_counter =0
         checkpoint_path = output_dir / f"best_model.pt"
         torch.save({
             'epoch': epoch,
@@ -130,14 +159,27 @@ for epoch in range(CONFIG['training']['num_epochs']):
         }, checkpoint_path)
 
         print(f"  ✓ Saved best model: {checkpoint_path}")
+    else:
+        patience_counter +=1
+        print(f" ! No improvement in validation loss. Patience counter: {patience_counter}/{max_patience}")
 
-    # Save periodic checkpoint
+        # early stopping
+        if patience_counter>= max_patience:
+            print(f"\n Early stopping at epoch {epoch +1}")
+            break
+
     if (epoch + 1) % 5 == 0:
         checkpoint_path = output_dir / f"checkpoint_epoch_{epoch+1}.pt"
         torch.save(model.state_dict(), checkpoint_path)
         print(f"  ✓ Saved checkpoint: {checkpoint_path}")
     
     print()
+
+
+# Save training history
+with open(output_dir / 'training_history.json', 'w') as f:
+    json.dump(history, f, indent=2)
+
 
 print("\n" + "="*60)
 print("✓ TRAINING COMPLETE!")
