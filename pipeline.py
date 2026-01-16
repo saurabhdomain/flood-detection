@@ -55,12 +55,15 @@ class FloodDetectionPipeline:
         
         # Setup experiment tracking
         if experiment_name is None:
-            experiment_name = f"{self.config['mlops']['experiment_name']}_{self.config['data']['modality']}_{self.config['model']['encoder_name']}"
+            mlops_config = self.config.get('mlops', {})
+            exp_base_name = mlops_config.get('experiment_name', 'flood_detection')
+            experiment_name = f"{exp_base_name}_{self.config['data']['modality']}_{self.config['model']['encoder_name']}"
         
+        mlops_config = self.config.get('mlops', {})
         self.tracker = ExperimentTracker(
             experiment_name=experiment_name,
-            tracking_uri=self.config['mlops'].get('mlflow_tracking_uri', './mlruns'),
-            use_mlflow=self.config['mlops'].get('use_mlflow', True)
+            tracking_uri=mlops_config.get('mlflow_tracking_uri', './mlruns'),
+            use_mlflow=mlops_config.get('use_mlflow', True)
         )
         
         # Log configuration
@@ -317,7 +320,8 @@ class FloodDetectionPipeline:
         }
         
         max_patience = self.config['training'].get('early_stopping_patience', 15)
-        primary_metric = self.config['mlops'].get('primary_metric', 'val_iou')
+        mlops_config = self.config.get('mlops', {})
+        primary_metric = mlops_config.get('primary_metric', 'val_iou')
         
         for epoch in range(self.config['training']['num_epochs']):
             # Train

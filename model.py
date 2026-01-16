@@ -27,7 +27,7 @@ if DEVICE.type == 'cuda':
     print(f"   GPU: {torch.cuda.get_device_name(0)}")
 
 ## Read Activation function from config
-activattion_function = CONFIG['model']['activation']
+activation_function = CONFIG['model']['activation']
 
 class UNetWithDropout(nn.Module):
 

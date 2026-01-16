@@ -237,14 +237,17 @@ def create_experiment_tracker(config, experiment_name=None):
     """
     if experiment_name is None:
         # Generate experiment name from config
-        modality = config['data']['modality']
-        encoder = config['model']['encoder_name']
+        modality = config.get('data', {}).get('modality', 's1')
+        encoder = config.get('model', {}).get('encoder_name', 'resnet18')
         experiment_name = f"flood_detection_{modality}_{encoder}"
+    
+    # Support both 'mlops' and 'mlflow' config sections for backward compatibility
+    mlops_config = config.get('mlops', config.get('mlflow', {}))
     
     tracker = ExperimentTracker(
         experiment_name=experiment_name,
-        tracking_uri=config.get('mlflow', {}).get('tracking_uri', './mlruns'),
-        use_mlflow=config.get('mlflow', {}).get('enabled', True)
+        tracking_uri=mlops_config.get('mlflow_tracking_uri', mlops_config.get('tracking_uri', './mlruns')),
+        use_mlflow=mlops_config.get('use_mlflow', mlops_config.get('enabled', True))
     )
     
     return tracker
