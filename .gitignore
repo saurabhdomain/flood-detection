@@ -23,6 +23,11 @@ outputs/
 *.pth
 checkpoints/
 
+# MLOps artifacts
+mlruns/
+experiments/
+.mlflow/
+
 # Logs
 logs/
 *.log
