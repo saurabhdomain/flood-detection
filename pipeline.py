@@ -136,6 +136,7 @@ class FloodDetectionPipeline:
         self.model = create_model(
             self.config['data']['modality'],
             self.config['model']['encoder_name'],
+            architecture=self.config['model'].get('architecture', 'unet'),
             device=self.device,
             dropout_rate=self.config['model'].get('dropout_rate', 0.5)
         )
