@@ -5,7 +5,6 @@ Includes IoU, F1, Precision, Recall, and other segmentation metrics
 
 import torch
 import numpy as np
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
 
 def calculate_iou(pred, target, threshold=0.5):
