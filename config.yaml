@@ -22,16 +22,25 @@ data:
 # MODEL CONFIGURATION
 # ============================================
 model:
+  # Model architecture: "unet", "deeplabv3+", "fpn", "pspnet"
+  architecture: "unet"
+  
   # Channels auto-calculated from modality:
-  # s1: 2 channels
-  # s2: 11 channels
-  # s1_s2: 13 channels
-  loss_function: "BCEWithLogitsLoss"  # Binary Cross Entropy Loss
-  encoder_name: "resnet18"  # Try: resnet34, resnet50, efficientnet-b0
+  # s1: 2 channels, s2: 11 channels, s1_s2: 13 channels
+  
+  # Encoder options: resnet18, resnet34, resnet50, resnet101,
+  #                  efficientnet-b0 to b7, mobilenet_v2, etc.
+  encoder_name: "resnet34"
   encoder_weights: "imagenet"
+  
+  # Model hyperparameters
   classes: 1  # Binary: flood or not
   activation: 'none'
-  dropout_rate: 0.3
+  dropout_rate: 0.5  # Increased from 0.3 to combat overfitting
+  
+  # Loss function: "BCEWithLogitsLoss", "DiceLoss", "FocalLoss", "Combined"
+  loss_function: "BCEWithLogitsLoss"
+  label_smoothing: 0.1  # Label smoothing to reduce overconfidence
 
 # ============================================
 # TRAINING CONFIGURATION
@@ -41,10 +50,45 @@ training:
   num_workers: 2
   num_epochs: 50
   learning_rate: 0.0001
-  weight_decay: 1e-3        # ← Add this
-  dropout_rate: 0.3           # ← Add this
-  early_stopping_patience: 10  # ← Add this
+  weight_decay: 1e-4        # L2 regularization
+  dropout_rate: 0.5         # Dropout rate
+  early_stopping_patience: 15
+  
+  # Learning rate scheduler
+  scheduler:
+    type: "ReduceLROnPlateau"  # or "CosineAnnealing", "StepLR"
+    patience: 5
+    factor: 0.5
+    min_lr: 1e-6
+  
+  # Gradient clipping
+  gradient_clip_norm: 1.0
+  
   device: "cuda"  # or "cpu"
+
+# ============================================
+# MLOPS CONFIGURATION
+# ============================================
+mlops:
+  # Experiment tracking
+  experiment_name: "flood_detection_pipeline"
+  use_mlflow: True
+  mlflow_tracking_uri: "./mlruns"
+  
+  # Model versioning
+  model_registry: True
+  save_best_only: True
+  
+  # Metrics to track
+  primary_metric: "val_iou"  # Metric to use for best model selection
+  track_metrics:
+    - "train_loss"
+    - "val_loss"
+    - "val_iou"
+    - "val_dice"
+    - "val_f1_score"
+    - "val_precision"
+    - "val_recall"
 
 # ============================================
 # OUTPUT CONFIGURATION
@@ -53,3 +97,4 @@ output:
   checkpoint_dir: "./outputs/models"
   log_dir: "./outputs/logs"
   plot_dir: "./outputs/plots"
+  experiment_dir: "./experiments"

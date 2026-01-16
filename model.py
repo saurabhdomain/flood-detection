@@ -78,27 +78,68 @@ def get_input_channels(modality):
     else:
         raise ValueError(f"Unknown modality: {modality}")
 
-def create_model(modality, encoder_name='resnet18', device=DEVICE, dropout_rate=0.3):
-    """Create U-Net with correct channels and move to device"""
+def create_model(modality, encoder_name='resnet18', architecture='unet', device=DEVICE, dropout_rate=0.3):
+    """
+    Create segmentation model with correct channels and move to device
     
+    Args:
+        modality: Data modality (s1, s2, s1_s2)
+        encoder_name: Encoder backbone (resnet18, resnet34, efficientnet-b0, etc.)
+        architecture: Model architecture (unet, deeplabv3+, fpn, pspnet)
+        device: Device to move model to
+        dropout_rate: Dropout rate for regularization
+    
+    Returns:
+        Model ready for training
+    """
     in_channels = get_input_channels(modality)
     
     print(f"\nCreating model:")
+    print(f"  Architecture: {architecture}")
     print(f"  Modality: {modality}")
     print(f"  Input channels: {in_channels}")
     print(f"  Encoder: {encoder_name}")
+    print(f"  Dropout rate: {dropout_rate}")
     
-    base_model = smp.Unet(
-        encoder_name=encoder_name,
-        encoder_weights='imagenet',
-        in_channels=in_channels,
-        classes=1,
-        decoder_dropout =0,
-        activation=None
-    )
+    # Select architecture
+    if architecture.lower() == 'unet':
+        base_model = smp.Unet(
+            encoder_name=encoder_name,
+            encoder_weights='imagenet',
+            in_channels=in_channels,
+            classes=1,
+            decoder_dropout=0,
+            activation=None
+        )
+    elif architecture.lower() == 'deeplabv3+':
+        base_model = smp.DeepLabV3Plus(
+            encoder_name=encoder_name,
+            encoder_weights='imagenet',
+            in_channels=in_channels,
+            classes=1,
+            activation=None
+        )
+    elif architecture.lower() == 'fpn':
+        base_model = smp.FPN(
+            encoder_name=encoder_name,
+            encoder_weights='imagenet',
+            in_channels=in_channels,
+            classes=1,
+            activation=None
+        )
+    elif architecture.lower() == 'pspnet':
+        base_model = smp.PSPNet(
+            encoder_name=encoder_name,
+            encoder_weights='imagenet',
+            in_channels=in_channels,
+            classes=1,
+            activation=None
+        )
+    else:
+        raise ValueError(f"Unknown architecture: {architecture}. Use 'unet', 'deeplabv3+', 'fpn', or 'pspnet'")
     
     # wrap base_model with UNetWithDropout
-    model =UNetWithDropout(base_model, dropout_rate=dropout_rate)
+    model = UNetWithDropout(base_model, dropout_rate=dropout_rate)
 
     # IMPORTANT: Move model to device (GPU or CPU)
     model = model.to(device)
@@ -114,6 +155,7 @@ if __name__ == "__main__":
     model = create_model(
         CONFIG['data']['modality'],
         CONFIG['model']['encoder_name'],
+        architecture=CONFIG['model'].get('architecture', 'unet'),
         device=DEVICE,
         dropout_rate=CONFIG['model'].get('dropout_rate', 0.3)
     )
