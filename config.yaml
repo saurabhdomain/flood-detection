@@ -2,7 +2,7 @@
 # DATA CONFIGURATION
 # ============================================
 data:
-  data_dir: "/workspace/geoai/flood_data/sturm"
+  data_dir: "/workspace/geoai/flood_data/"
   
   # Which modality to use? Pick ONE:
   # - "s1"      (Sentinel-1 SAR only - 2 channels)
@@ -14,7 +14,7 @@ data:
   # - "s1" (Sentinel-1 mask)
   # - "s2" (Sentinel-2 mask)
   mask_source: "s1"
-  
+  augmentation: True 
   train_val_split: 0.8
   random_seed: 42
 
@@ -31,18 +31,19 @@ model:
   encoder_weights: "imagenet"
   classes: 1  # Binary: flood or not
   activation: 'none'
+  dropout_rate: 0.3
 
 # ============================================
 # TRAINING CONFIGURATION
 # ============================================
 training:
-  batch_size: 8
+  batch_size: 16
   num_workers: 2
   num_epochs: 50
   learning_rate: 0.0001
-  weight_decay: 1e-4          # ← Add this
+  weight_decay: 1e-3        # ← Add this
   dropout_rate: 0.3           # ← Add this
-  early_stopping_patience: 5  # ← Add this
+  early_stopping_patience: 10  # ← Add this
   device: "cuda"  # or "cpu"
 
 # ============================================

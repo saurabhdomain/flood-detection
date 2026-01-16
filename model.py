@@ -60,8 +60,9 @@ class UNetWithDropout(nn.Module):
         # nn.Dropout2d automatically:
         # 1. If training: Generate mask, apply it, scale by 1/(1-p)
         # 2. If eval: Do nothing (pass through unchanged)
-        decoder_output = self.dropout(decoder_output)
         
+        if self.training:
+            decoder_output = self.dropout(decoder_output)
         # Segmentation head
         output = self.model.segmentation_head(decoder_output)
         

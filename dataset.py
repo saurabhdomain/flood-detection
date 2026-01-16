@@ -10,10 +10,13 @@ import rasterio
 from torch.utils.data import Dataset, DataLoader
 import torch
 import yaml
+import albumentations as A
 
 #-----------------------------------
 # Load Configuration
 #-----------------------------------
+script_dir = Path(__file__).resolve().parent
+os.chdir(script_dir)
 
 def load_config(config_path = 'config.yaml'):
     with open(config_path, 'r') as f:
@@ -74,6 +77,56 @@ class FloodDataset(Dataset):
         print(f"\n[{split.upper()}] Modality: {modality}")
         print(f"  Files: {len(self.files)}")
         print(f"  Mask source: {mask_source}")
+
+        # ADD AUGMENTATION SETUP
+
+        if split =='train' and CONFIG['data'].get('augmentation', False):
+            self.transform = self._get_train_transform()
+            print(f"  ✅ Augmentation ENABLED with {len(self.transform.transforms)} transforms")
+        else:
+            self.transform = None
+            print(f"  ❌ Augmentation DISABLED for {split}")
+
+    def _get_train_transform(self):
+        """Define augmentation transforms for training"""
+        return A.Compose([
+            # Spatial transforms
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            
+            # ✅ STRONGER: More aggressive spatial transforms
+            A.Affine(
+                scale=(0.9, 1.1),
+                translate_percent=(-0.1, 0.1),
+                rotate=(-30, 30),
+                shear=(-10, 10),
+                p=0.5
+            ),
+            
+            # ✅ ADD: Elastic transform for deformation
+            A.ElasticTransform(alpha=50, sigma=5, p=0.2),
+            
+            # ✅ ADD: Coarse dropout (cutout)
+            A.CoarseDropout(
+                max_holes=8,
+                max_height=32,
+                max_width=32,
+                min_holes=1,
+                min_height=8,
+                min_width=8,
+                fill_value=0,
+                p=0.3
+            ),
+            
+            # Noise and brightness
+            A.GaussNoise(std_range=(0.01, 0.05), p=0.3),
+            A.RandomBrightnessContrast(
+                brightness_limit=0.2,
+                contrast_limit=0.2,
+                p=0.3
+            ),
+        ])
     
     def __len__(self):
         return len(self.files)
@@ -100,6 +153,19 @@ class FloodDataset(Dataset):
         else :
             mask = self._load_s2_mask(filename)
         
+         # ✅ ADD AUGMENTATION HERE
+        if self.transform:
+            # Prepare for albumentations: (H, W, C) for image, (H, W) for mask
+            image_for_aug = np.transpose(images, (1, 2, 0))  # (C,H,W) → (H,W,C)
+            mask_for_aug = mask[0]  # Remove channel: (1,H,W) → (H,W)
+            
+            # Apply augmentation
+            augmented = self.transform(image=image_for_aug, mask=mask_for_aug)
+            
+            # Convert back to original format
+            images = np.transpose(augmented['image'], (2, 0, 1))  # (H,W,C) → (C,H,W)
+            mask = augmented['mask'][np.newaxis, :, :]  # (H,W) → (1,H,W)
+
 
         return {
             "images": torch.from_numpy(images).float(),
@@ -110,14 +176,32 @@ class FloodDataset(Dataset):
     def _load_s1(self, filename):
         with rasterio.open(self.s1_dir/filename) as src:
             sar = src.read().astype(np.float32)
-            #normalise
+            
+            # ✅ FIX: Handle invalid values BEFORE processing
+            sar = np.nan_to_num(sar, nan=0.0, posinf=0.0, neginf=0.0)
+            
+            # ✅ FIX: Clip extreme values before log transform
+            sar = np.clip(sar, -1e6, 1e6)
+            
+            # Log transform
             sar = np.log1p(np.abs(sar))
-            sar = (sar-sar.mean(axis=(1,2),keepdims=True))/(sar.std(axis=(1,2),keepdims=True)+1e-8)
+            
+            # ✅ FIX: Robust normalization with minimum std threshold
+            mean = sar.mean(axis=(1,2), keepdims=True)
+            std = sar.std(axis=(1,2), keepdims=True)
+            std = np.maximum(std, 0.01)  # Prevent division by very small std
+            
+            sar = (sar - mean) / std
+            
+            # ✅ FIX: Final clip to prevent extreme values
+            sar = np.clip(sar, -10, 10)
         return sar
 
     def _load_s2(self, filename):
         with rasterio.open(self.s2_dir/filename) as src:
             optical = src.read().astype(np.float32)
+            # ✅ FIX: Handle invalid values
+            optical = np.nan_to_num(optical, nan=0.0, posinf=1.0, neginf=0.0)
             #normalise
             optical = optical/10000.0
             optical= np.clip(optical, 0,1)
@@ -126,11 +210,15 @@ class FloodDataset(Dataset):
     def _load_s1_mask(self, filename):
         with rasterio.open(self.s1_mask_dir/filename) as src:
             mask = src.read(1).astype(np.float32)
+            # ✅ FIX: Handle invalid mask values
+        mask = np.nan_to_num(mask, nan=0.0)
         return (mask ==1).astype(np.float32)[np.newaxis,:,:]
 
     def _load_s2_mask(self, filename):
         with rasterio.open(self.s2_mask_dir/filename) as src:
             mask = src.read(1).astype(np.float32)
+        # ✅ FIX: Handle invalid mask values
+        mask = np.nan_to_num(mask, nan=0.0)
         return (mask ==1).astype(np.float32)[np.newaxis,:,:]
 
 if __name__ =="__main__":

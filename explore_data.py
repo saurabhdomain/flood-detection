@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 # MODIFY THIS PATH to your data
-DATA_PATH = "/workspace/geoai/flood_data/sturm"  # ← CHANGE THIS
+DATA_PATH = "/workspace/geoai/flood_data/"  # ← CHANGE THIS
 
 def explore_directory(path, max_depth=3, current_depth=0):
     """Print directory structure nicely"""
