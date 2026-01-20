@@ -67,6 +67,23 @@ if diff > 0.001:
 else:
     print("  ⚠️  Augmentation may not be working or too weak!")
 
+# Check class balance for loss function selection
+print(f"\n📊 Checking class balance:")
+total_pixels = 0
+flood_pixels = 0
+for i in range(min(50, len(training_dataset))):  # Sample 50 images for speed
+    mask = training_dataset[i]['masks'].numpy()
+    total_pixels += mask.size
+    flood_pixels += mask.sum()
+flood_pct = (flood_pixels / total_pixels) * 100
+print(f"  Flood pixels: {flood_pct:.2f}%")
+if flood_pct < 20:
+    print("  ⚠️ Imbalanced data! Consider Dice or Combined loss")
+elif flood_pct > 80:
+    print("  ⚠️ Mostly flood! Check your data")
+else:
+    print("  ✅ Relatively balanced, BCE + Smoothing should work")
+
 # Setup Training
 class SmoothBCEWithLogitsLoss(nn.Module):
     def __init__(self, smoothing=0.1):
@@ -81,7 +98,7 @@ class SmoothBCEWithLogitsLoss(nn.Module):
 # criterion = nn.BCEWithLogitsLoss()  # ← OLD
 criterion = SmoothBCEWithLogitsLoss(smoothing=0.1)
 
-optimiser = torch.optim.Adam(model.parameters(),lr = CONFIG['training']['learning_rate'], weight_decay= 1e-4)
+optimiser = torch.optim.AdamW(model.parameters(),lr = CONFIG['training']['learning_rate'], weight_decay= 1e-4)
 
 scheduler = torch .optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode= 'min', factor =0.5 , patience= 5,min_lr=1e-6,)
 # create output directorry
@@ -157,10 +174,8 @@ for epoch in range(CONFIG['training']['num_epochs']):
 
       
         loss.backward()
-        # ✅ Check gradient norms BEFORE clipping
+        # Clip gradients and get original norm (for monitoring)
         total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-         # ✅ ADD GRADIENT CLIPPING HERE (before optimizer.step())
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimiser.step()
 
         train_loss +=loss.item()
