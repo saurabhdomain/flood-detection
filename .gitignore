@@ -23,6 +23,12 @@ outputs/
 *.pth
 checkpoints/
 
+# Training history analysis outputs (keep originals, ignore generated)
+training_history_filtered.json
+training_history_top*.json
+training_history_before_*.json
+training_history_analysis.png
+
 # Logs
 logs/
 *.log
