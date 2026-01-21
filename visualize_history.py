@@ -12,10 +12,25 @@ import numpy as np
 from pathlib import Path
 import argparse
 
+# Configuration constants
+OVERFITTING_WINDOW = 5  # Number of epochs to check for overfitting trend
+OVERFITTING_THRESHOLD = 0.01  # Threshold for detecting overfitting
+STABILITY_WINDOW = 5  # Number of epochs to check for stability
+STABILITY_THRESHOLD = 0.01  # Standard deviation threshold for stable epochs
+
 def load_history(history_path='training_history.json'):
     """Load training history from JSON file."""
-    with open(history_path, 'r') as f:
-        return json.load(f)
+    try:
+        with open(history_path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"❌ Error: History file not found: {history_path}")
+        print(f"   Make sure the file exists or provide the correct path with --history")
+        exit(1)
+    except json.JSONDecodeError as e:
+        print(f"❌ Error: Invalid JSON in history file: {history_path}")
+        print(f"   {str(e)}")
+        exit(1)
 
 def highlight_key_epochs(history):
     """Identify and return key epochs worth keeping."""
@@ -47,17 +62,17 @@ def highlight_key_epochs(history):
     
     # Detect overfitting (when val loss starts increasing while train keeps decreasing)
     for i in range(10, len(val_losses)):
-        recent_val_trend = val_losses[i] - val_losses[i-5]
-        recent_train_trend = train_losses[i] - train_losses[i-5]
+        recent_val_trend = val_losses[i] - val_losses[i-OVERFITTING_WINDOW]
+        recent_train_trend = train_losses[i] - train_losses[i-OVERFITTING_WINDOW]
         
-        if recent_val_trend > 0.01 and recent_train_trend < 0:
+        if recent_val_trend > OVERFITTING_THRESHOLD and recent_train_trend < 0:
             key_epochs['overfitting_start'] = epochs[i]
             break
     
-    # Find stable epochs (low variation in last 5 epochs)
-    for i in range(5, len(val_losses)):
-        window = val_losses[i-5:i]
-        if np.std(window) < 0.01:
+    # Find stable epochs (low variation in last epochs)
+    for i in range(STABILITY_WINDOW, len(val_losses)):
+        window = val_losses[i-STABILITY_WINDOW:i]
+        if np.std(window) < STABILITY_THRESHOLD:
             key_epochs['stable_epochs'].append(epochs[i])
     
     return key_epochs

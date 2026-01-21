@@ -12,8 +12,17 @@ from pathlib import Path
 
 def load_history(history_path='training_history.json'):
     """Load training history from JSON file."""
-    with open(history_path, 'r') as f:
-        return json.load(f)
+    try:
+        with open(history_path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"❌ Error: History file not found: {history_path}")
+        print(f"   Make sure the file exists or provide the correct path with --history")
+        exit(1)
+    except json.JSONDecodeError as e:
+        print(f"❌ Error: Invalid JSON in history file: {history_path}")
+        print(f"   {str(e)}")
+        exit(1)
 
 def save_history(history, output_path):
     """Save filtered history to JSON file."""
@@ -69,25 +78,41 @@ def interactive_filter(history):
     
     if choice == '1':
         epochs_str = input("Enter epoch numbers separated by commas: ").strip()
-        epochs_to_keep = set(int(e.strip()) for e in epochs_str.split(','))
+        try:
+            epochs_to_keep = set(int(e.strip()) for e in epochs_str.split(',') if e.strip())
+        except ValueError:
+            print("❌ Error: Invalid input. Please enter numbers separated by commas.")
+            epochs_to_keep = set(history['epoch'])
     
     elif choice == '2':
         range_str = input("Enter range (e.g., '1-21'): ").strip()
-        start, end = map(int, range_str.split('-'))
-        epochs_to_keep = set(range(start, end + 1))
+        try:
+            start, end = map(int, range_str.split('-'))
+            epochs_to_keep = set(range(start, end + 1))
+        except ValueError:
+            print("❌ Error: Invalid range format. Please use 'start-end' format.")
+            epochs_to_keep = set(history['epoch'])
     
     elif choice == '3':
-        n = int(input("Enter N (number of best epochs to keep): ").strip())
-        # Sort epochs by validation loss and keep best N
-        val_losses = history['val_losses']
-        epoch_loss_pairs = list(zip(history['epoch'], val_losses))
-        epoch_loss_pairs.sort(key=lambda x: x[1])
-        epochs_to_keep = set(epoch for epoch, _ in epoch_loss_pairs[:n])
+        try:
+            n = int(input("Enter N (number of best epochs to keep): ").strip())
+            # Sort epochs by validation loss and keep best N
+            val_losses = history['val_losses']
+            epoch_loss_pairs = list(zip(history['epoch'], val_losses))
+            epoch_loss_pairs.sort(key=lambda x: x[1])
+            epochs_to_keep = set(epoch for epoch, _ in epoch_loss_pairs[:n])
+        except ValueError:
+            print("❌ Error: Invalid number. Please enter a valid integer.")
+            epochs_to_keep = set(history['epoch'])
     
     elif choice == '4':
         epochs_str = input("Enter epoch numbers to REMOVE separated by commas: ").strip()
-        epochs_to_remove = set(int(e.strip()) for e in epochs_str.split(','))
-        epochs_to_keep = set(history['epoch']) - epochs_to_remove
+        try:
+            epochs_to_remove = set(int(e.strip()) for e in epochs_str.split(',') if e.strip())
+            epochs_to_keep = set(history['epoch']) - epochs_to_remove
+        except ValueError:
+            print("❌ Error: Invalid input. Please enter numbers separated by commas.")
+            epochs_to_keep = set(history['epoch'])
     
     elif choice == '5':
         epochs_to_keep = set(history['epoch'])
@@ -153,13 +178,21 @@ def main():
         epochs_to_keep = interactive_filter(history)
     
     elif args.keep_epochs:
-        epochs_to_keep = sorted(set(int(e.strip()) for e in args.keep_epochs.split(',')))
-        print(f"Keeping epochs: {epochs_to_keep}")
+        try:
+            epochs_to_keep = sorted(set(int(e.strip()) for e in args.keep_epochs.split(',') if e.strip()))
+            print(f"Keeping epochs: {epochs_to_keep}")
+        except ValueError:
+            print("❌ Error: Invalid epoch numbers in --keep-epochs. Use comma-separated integers.")
+            return
     
     elif args.keep_range:
-        start, end = map(int, args.keep_range.split('-'))
-        epochs_to_keep = list(range(start, end + 1))
-        print(f"Keeping epochs from {start} to {end}")
+        try:
+            start, end = map(int, args.keep_range.split('-'))
+            epochs_to_keep = list(range(start, end + 1))
+            print(f"Keeping epochs from {start} to {end}")
+        except ValueError:
+            print("❌ Error: Invalid range format in --keep-range. Use 'start-end' format.")
+            return
     
     elif args.keep_best:
         val_losses = history['val_losses']
@@ -169,10 +202,14 @@ def main():
         print(f"Keeping {args.keep_best} best epochs by validation loss: {epochs_to_keep}")
     
     elif args.remove_epochs:
-        epochs_to_remove = set(int(e.strip()) for e in args.remove_epochs.split(','))
-        epochs_to_keep = sorted(set(history['epoch']) - epochs_to_remove)
-        print(f"Removing epochs: {sorted(epochs_to_remove)}")
-        print(f"Keeping epochs: {epochs_to_keep}")
+        try:
+            epochs_to_remove = set(int(e.strip()) for e in args.remove_epochs.split(',') if e.strip())
+            epochs_to_keep = sorted(set(history['epoch']) - epochs_to_remove)
+            print(f"Removing epochs: {sorted(epochs_to_remove)}")
+            print(f"Keeping epochs: {epochs_to_keep}")
+        except ValueError:
+            print("❌ Error: Invalid epoch numbers in --remove-epochs. Use comma-separated integers.")
+            return
     
     else:
         print("No filtering option specified. Use --help for options.")
