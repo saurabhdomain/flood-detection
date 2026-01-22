@@ -135,12 +135,12 @@ if [ "$SKIP_INSTALL" = false ]; then
     pip install -r requirements.txt
     print_step "Installed requirements.txt"
     
-    # Run setup.py if it exists
+    # Run setup.py verification if it exists
     if [ -f "setup.py" ]; then
         echo ""
-        echo "📦 Installing package via setup.py..."
-        pip install -e .
-        print_step "Installed package in editable mode"
+        echo "� Running setup verification..."
+        python setup.py
+        print_step "Setup verification complete"
     fi
 else
     print_warning "Skipping dependency installation"

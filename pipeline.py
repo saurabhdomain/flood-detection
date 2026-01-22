@@ -147,21 +147,23 @@ class FloodDetectionPipeline:
         print(f"✓ Loss: BCEWithLogitsLoss (smoothing={smoothing})")
         
         # Setup optimizer
+        lr = float(self.config['training']['learning_rate'])
+        weight_decay = float(self.config['training'].get('weight_decay', 1e-4))
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),
-            lr=self.config['training']['learning_rate'],
-            weight_decay=self.config['training'].get('weight_decay', 1e-4)
+            lr=lr,
+            weight_decay=weight_decay
         )
-        print(f"✓ Optimizer: Adam (lr={self.config['training']['learning_rate']})")
+        print(f"✓ Optimizer: Adam (lr={lr}, weight_decay={weight_decay})")
         
         # Setup scheduler
         scheduler_config = self.config['training'].get('scheduler', {})
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
             mode='min',
-            factor=scheduler_config.get('factor', 0.5),
-            patience=scheduler_config.get('patience', 5),
-            min_lr=scheduler_config.get('min_lr', 1e-6)
+            factor=float(scheduler_config.get('factor', 0.5)),
+            patience=int(scheduler_config.get('patience', 5)),
+            min_lr=float(scheduler_config.get('min_lr', 1e-6))
         )
         print(f"✓ Scheduler: ReduceLROnPlateau\n")
         
